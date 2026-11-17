@@ -293,8 +293,32 @@ def hybrid_search(chunks, vectors, query, k=3, rrf_k=60):
     top_indices = np.argsort([-s for s in rrf_scores], kind="stable")[:k]
     return [chunks[idx] for idx in top_indices]
 
-# Step 4 - build_prompt (not yet solved)
-# TODO: implement
+# Step 4 - build_prompt
+SYSTEM_RULES = ("You answer questions for an outdoor gear store using only the context, preferring trusted sources. Reply with JSON: "
+                "answer, citations (chunk ids), confidence (0 to 1), and optionally tool_call.")
+
+
+def build_prompt(question, chunks, tools=None, budget=120):
+    """System rules, tools, labelled context chunks under a token budget, then the question."""
+    rules_line = f"SYSTEM: {SYSTEM_RULES}\n"
+    if tools:
+        tools_list = ", ".join(tools)
+        tools_line = f"TOOLS: {tools_list}\n"
+        rules_line += tools_line
+
+    chunks_line = ""
+    for chunk in chunks:
+        header = (
+            f"[{chunk['id']}] ({'trusted' if chunk['trusted'] else 'untrusted'})"
+            f" {chunk['path']}"
+        )
+        text = chunk["text"]
+        chunk_tokens = count_tokens(header) + count_tokens(text)
+        if count_tokens(chunks_line) + chunk_tokens > budget:
+            break
+        chunks_line += f"{header}\n{text}\n"
+    result = f"{rules_line}CONTEXT:\n{chunks_line}QUESTION: {question}"
+    return str(result)
 
 # Step 5 - parse_answer (not yet solved)
 # TODO: implement
