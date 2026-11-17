@@ -271,8 +271,27 @@ def bm25_scores(chunks, query, k1=1.5, b=0.75):
         scores.append(score)
     return scores
 
-# Step 3 - hybrid_search (not yet solved)
-# TODO: implement
+# Step 3 - hybrid_search
+import numpy as np
+
+def hybrid_search(chunks, vectors, query, k=3, rrf_k=60):
+    """The top k chunks by reciprocal rank fusion of embedding and BM25 rankings."""
+    query_embedding = embed(query)
+    dense_scores = np.dot(vectors, query_embedding).tolist()
+    sparce_scores = bm25_scores(chunks, query)
+
+    dense_ranking = np.argsort([-s for s in dense_scores], kind="stable")
+    bm25_ranking = np.argsort([-s for s in sparce_scores], kind="stable")
+    rrf_scores = [0.0] * len(chunks)
+
+    for rank, idx in enumerate(dense_ranking, start=1):
+        rrf_scores[idx] += 1 / (rrf_k + rank) 
+    
+    for rank, idx in enumerate(bm25_ranking, start=1):
+        rrf_scores[idx] += 1 / (rrf_k + rank) 
+    
+    top_indices = np.argsort([-s for s in rrf_scores], kind="stable")[:k]
+    return [chunks[idx] for idx in top_indices]
 
 # Step 4 - build_prompt (not yet solved)
 # TODO: implement
