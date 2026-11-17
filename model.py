@@ -320,8 +320,41 @@ def build_prompt(question, chunks, tools=None, budget=120):
     result = f"{rules_line}CONTEXT:\n{chunks_line}QUESTION: {question}"
     return str(result)
 
-# Step 5 - parse_answer (not yet solved)
-# TODO: implement
+# Step 5 - parse_answer
+import re
+import json
+def parse_answer(raw, known_ids):
+    """(answer dict, []) if the reply holds a valid answer, else (None, list of error messages)."""
+    
+    match = re.search(r"\{(.*)\}", raw, flags=re.DOTALL)
+
+    if not match:
+        return (None, ["no JSON object found"])
+
+    try:
+        data = json.loads(match.group(0))
+    except json.JSONDecodeError:
+        return (None, ["invalid JSON"])
+
+    problems = []
+    if not isinstance(data.get('answer'), str):
+        problems.append("answer must be a string")
+    if not isinstance(data.get('citations'), list) or any(c not in known_ids for c in data.get('citations')):
+        problems.append("citations must be a list of chunk ids from the context")
+    if (isinstance(data.get("confidence"), bool) 
+        or not isinstance(data.get("confidence"), (int, float)) 
+        or not (0 <= data.get("confidence") <= 1)):
+        problems.append("confidence must be a number from 0 to 1")
+    if data.get('tool_call') is not None and (
+        not isinstance(data.get('tool_call'), dict)
+        or not isinstance(data.get('tool_call').get("name"), str)
+        or not isinstance(data.get('tool_call').get("args"), dict)
+    ):
+        problems.append("tool_call must have a name and an args object")
+
+    if problems:
+        return (None, problems)
+    return (data, [])
 
 # Step 6 - ask (not yet solved)
 # TODO: implement
