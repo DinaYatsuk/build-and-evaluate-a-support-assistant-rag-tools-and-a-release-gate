@@ -356,8 +356,35 @@ def parse_answer(raw, known_ids):
         return (None, problems)
     return (data, [])
 
-# Step 6 - ask (not yet solved)
-# TODO: implement
+# Step 6 - ask
+def ask(model, prompt, known_ids, max_attempts=2):
+    """Call the model, validate, and retry with the errors fed back, up to max_attempts."""
+    p = prompt
+    in_price, out_price = PRICES[model]
+    n = 0
+    total = 0.0
+    errors = []
+    obj = None
+    for attempt in range(max_attempts):
+        raw = scripted_llm(model, p)
+        total += (count_tokens(p) * in_price + count_tokens(raw) * out_price) / 1e6
+        n += 1
+        try:
+            parsed_obj, current_errors = parse_answer(raw, known_ids)
+            current_errors = [str(e) for e in current_errors]
+        except Exception as e:
+            parsed_obj, current_errors = None, [str(e)]
+            errors.append(e)
+        if not current_errors:
+            obj = parsed_obj
+            break
+        errors.extend(current_errors)
+        p = prompt + "\nERRORS: " + "; ".join(current_errors) + "\nReply with valid JSON only."
+
+    return {"result": obj or None, 
+            "attempts": n, 
+            "errors": errors or [], 
+            "cost": total}
 
 # Step 7 - cascade (not yet solved)
 # TODO: implement
