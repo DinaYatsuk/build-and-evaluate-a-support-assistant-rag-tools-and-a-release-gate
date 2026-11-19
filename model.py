@@ -386,8 +386,26 @@ def ask(model, prompt, known_ids, max_attempts=2):
             "errors": errors or [], 
             "cost": total}
 
-# Step 7 - cascade (not yet solved)
-# TODO: implement
+# Step 7 - cascade
+def cascade(prompt, known_ids, threshold=0.6):
+    """Small model first; the large model when the small one fails or is below the confidence threshold."""
+    
+    first = ask("small", prompt, known_ids)
+    if first is not None:
+        payload = first.get('result')
+        confidence = payload.get("confidence")
+        tool_call = bool(payload.get("tool_call"))
+
+        if tool_call or (confidence is not None and confidence >= threshold):
+            return {**first, "model": "small", "escalated": False}
+
+    second = ask("large", prompt, known_ids)
+        
+    return {**second, 
+            "model": "large", 
+            "escalated": True, 
+            "cost": first.get('cost') + second.get('cost') if first else second.get('cost')
+            }
 
 # Step 8 - permission_gate (not yet solved)
 # TODO: implement
